@@ -2,6 +2,52 @@ const mineflayer = require('mineflayer');
 const Movements = require('mineflayer-pathfinder').Movements;
 const pathfinder = require('mineflayer-pathfinder').pathfinder;
 const { GoalBlock } = require('mineflayer-pathfinder').goals;
+const http = require('http');
+
+// Aggressive keep-alive for Replit Free
+const keepAlive = () => {
+    setInterval(() => {
+        console.log(`[${new Date().toISOString()}] ⚡ Keep-alive - Process ID: ${process.pid}`);
+        
+        // Make HTTP request to self to prevent sleeping
+        const options = {
+            hostname: 'localhost',
+            port: process.env.PORT || 8000,
+            path: '/ping',
+            method: 'GET',
+            timeout: 5000
+        };
+        
+        const req = http.request(options, (res) => {
+            // Self-ping successful
+        });
+        
+        req.on('error', (err) => {
+            // Ignore self-ping errors
+        });
+        
+        req.end();
+    }, 25000); // Every 25 seconds
+};
+
+// Process signal handlers for Replit Free
+process.on('SIGTERM', () => {
+    console.log('Received SIGTERM, keeping process alive...');
+});
+
+process.on('SIGINT', () => {
+    console.log('Received SIGINT, keeping process alive...');
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+    // Don't exit, keep running
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    // Don't exit, keep running
+});
 
 // Load environment variables for cloud deployment
 try {
@@ -56,11 +102,15 @@ app.listen(PORT, '0.0.0.0', () => {
   if (process.env.REPL_SLUG) {
     console.log(`🔗 Replit URL: https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`);
   }
+  
+  // Start aggressive keep-alive system for Replit Free
+  console.log('🚀 Starting Replit Free keep-alive system...');
+  keepAlive();
 });
 
-// Keep-alive mechanism for UptimeRobot
+// Additional keep-alive mechanism for UptimeRobot
 setInterval(() => {
-  console.log('💓 Keep-alive ping');
+  console.log('💓 UptimeRobot keep-alive ping');
 }, 300000); // Ping every 5 minutes
 
 let reconnectAttempts = 0;

@@ -1,25 +1,12 @@
-entrypoint = "index.js"
-modules = ["nodejs-20"]
+run = "node index.js"
+language = "nodejs"
+
+[nix]
+channel = "stable-22_11"
 
 [env]
 PATH = "/home/runner/$REPL_SLUG/.config/npm/node_global/bin:/home/runner/$REPL_SLUG/node_modules/.bin"
 npm_config_prefix = "/home/runner/$REPL_SLUG/.config/npm/node_global"
-
-[gitHubImport]
-requiredFiles = [".replit", "repl.nix"]
-
-[packager]
-language = "nodejs"
-[packager.features]
-packageSearch = true
-guessImports = true
-enabledForHosting = false
-
-[languages]
-[languages.javascript]
-pattern = "**/{*.js,*.jsx,*.ts,*.tsx,*.json}"
-[languages.javascript.languageServer]
-start = "typescript-language-server --stdio"
 
 [[ports]]
 localPort = 8000
