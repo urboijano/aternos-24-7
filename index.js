@@ -3,20 +3,74 @@ const Movements = require('mineflayer-pathfinder').Movements;
 const pathfinder = require('mineflayer-pathfinder').pathfinder;
 const { GoalBlock } = require('mineflayer-pathfinder').goals;
 
+// Load environment variables if available
+try {
+  require('dotenv').config();
+} catch (err) {
+  console.log('💡 dotenv not found, using system environment variables');
+}
+
 const config = require('./settings.json');
 const express = require('express');
+
+// Override config with environment variables if available
+if (process.env.MINECRAFT_HOST) {
+  config.server.ip = process.env.MINECRAFT_HOST;
+}
+if (process.env.MINECRAFT_PORT) {
+  config.server.port = parseInt(process.env.MINECRAFT_PORT);
+}
+if (process.env.MINECRAFT_VERSION) {
+  config.server.version = process.env.MINECRAFT_VERSION;
+}
+if (process.env.BOT_USERNAME) {
+  config['bot-account'].username = process.env.BOT_USERNAME;
+}
+if (process.env.BOT_AUTH_TYPE) {
+  config['bot-account'].type = process.env.BOT_AUTH_TYPE;
+}
 
 const app = express();
 
 app.get('/', (req, res) => {
-  res.send('Bot has arrived');
+  res.send('Minecraft AFK Bot is running! 🎮');
 });
 
-app.listen(8000, () => {
-  console.log('Server started');
+app.get('/health', (req, res) => {
+  const status = {
+    status: 'online',
+    bot_connected: isConnected,
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+    server: config.server.ip + ':' + config.server.port,
+    reconnect_attempts: reconnectAttempts
+  };
+  res.json(status);
 });
+
+app.get('/ping', (req, res) => {
+  res.send('pong');
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🌐 Web server started on port ${PORT}`);
+  console.log(`🔗 Visit: https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`);
+});
+
+// Keep-alive ping for Replit
+setInterval(() => {
+  console.log('🔄 Keep-alive ping');
+}, 60000); // Ping every minute
+
+let reconnectAttempts = 0;
+const maxReconnectAttempts = 10;
+let isConnected = false;
+let reconnectTimeout = null;
 
 function createBot() {
+   console.log(`[INFO] Creating bot... (Attempt ${reconnectAttempts + 1}/${maxReconnectAttempts})`);
+   
    const bot = mineflayer.createBot({
       username: config['bot-account']['username'],
       password: config['bot-account']['password'],
@@ -25,7 +79,11 @@ function createBot() {
       port: config.server.port,
       version: config.server.version,
       checkTimeoutInterval: 60 * 60 * 1000, // 1 hour timeout instead of 30 seconds
+      connectTimeout: 30000, // 30 second connection timeout
+      hideErrors: false, // Show all errors for debugging
    });
+   
+   console.log(`[DEBUG] Attempting to connect to ${config.server.ip}:${config.server.port} as '${config['bot-account']['username']}'`);
 
    bot.loadPlugin(pathfinder);
    const mcData = require('minecraft-data')(bot.version);
@@ -33,6 +91,7 @@ function createBot() {
    bot.settings.colorsEnabled = false;
 
    let pendingPromise = Promise.resolve();
+   let afkInterval = null;
 
    function sendRegister(password) {
       return new Promise((resolve, reject) => {
@@ -80,8 +139,21 @@ function createBot() {
       });
    }
 
-   bot.once('spawn', () => {
-      console.log('\x1b[33m[AfkBot] Bot joined the server', '\x1b[0m');
+   bot.on('spawn', () => {
+      isConnected = true;
+      console.log('\x1b[33m[AfkBot] Bot fully spawned and ready', '\x1b[0m');
+      
+      // Add keep alive mechanism
+      const keepAliveInterval = setInterval(() => {
+         if (bot.player && bot.player.entity) {
+            // Send a subtle keep-alive action (looking around slightly)
+            const currentYaw = bot.entity.yaw;
+            bot.look(currentYaw + 0.1, bot.entity.pitch);
+         }
+      }, 30000); // Every 30 seconds
+      
+      // Store interval for cleanup
+      bot.keepAliveInterval = keepAliveInterval;
 
       if (config.utils['auto-auth'].enabled) {
          console.log('[INFO] Started auto-auth module');
@@ -128,11 +200,43 @@ function createBot() {
          bot.pathfinder.setGoal(new GoalBlock(pos.x, pos.y, pos.z));
       }
 
-      if (config.utils['anti-afk'].enabled) {
-         bot.setControlState('jump', true);
-         if (config.utils['anti-afk'].sneak) {
-            bot.setControlState('sneak', true);
-         }
+      if (config.utils['anti-afk'].enabled && !afkInterval) {
+         console.log('[INFO] Anti-AFK enabled - bot will move around');
+         
+         afkInterval = setInterval(() => {
+            if (!bot.entity) return;
+            
+            const actions = [
+               () => {
+                  bot.setControlState('forward', true);
+                  setTimeout(() => bot.setControlState('forward', false), 500);
+               },
+               () => {
+                  bot.setControlState('back', true);
+                  setTimeout(() => bot.setControlState('back', false), 500);
+               },
+               () => {
+                  bot.setControlState('left', true);
+                  setTimeout(() => bot.setControlState('left', false), 500);
+               },
+               () => {
+                  bot.setControlState('right', true);
+                  setTimeout(() => bot.setControlState('right', false), 500);
+               },
+               () => {
+                  bot.setControlState('jump', true);
+                  setTimeout(() => bot.setControlState('jump', false), 100);
+               },
+               () => {
+                  const yaw = Math.random() * Math.PI * 2;
+                  bot.look(yaw, 0);
+               }
+            ];
+            
+            const randomAction = actions[Math.floor(Math.random() * actions.length)];
+            randomAction();
+            
+         }, 3000);
       }
    });
 
@@ -150,24 +254,106 @@ function createBot() {
    });
 
    if (config.utils['auto-reconnect']) {
-      bot.on('end', () => {
-         setTimeout(() => {
-            createBot();
-         }, config.utils['auto-recconect-delay']);
+      bot.on('end', (reason) => {
+         // Mark as disconnected
+         isConnected = false;
+         
+         // Clean up all intervals
+         if (afkInterval) {
+            clearInterval(afkInterval);
+            afkInterval = null;
+         }
+         if (bot.keepAliveInterval) {
+            clearInterval(bot.keepAliveInterval);
+            bot.keepAliveInterval = null;
+         }
+         
+         console.log(`[INFO] Bot disconnected. Reason: ${reason || 'Unknown'}`);
+         
+         // Only reconnect if we're not already connected and haven't exceeded attempts
+         if (!isConnected && reconnectAttempts < maxReconnectAttempts) {
+            reconnectAttempts++;
+            const baseDelay = config.utils['auto-reconnect-delay'] || 5000;
+            // Exponential backoff: increase delay with each attempt
+            const delay = Math.min(baseDelay * Math.pow(1.5, reconnectAttempts - 1), 60000);
+            console.log(`[INFO] Reconnecting in ${delay/1000} seconds... (Attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
+            
+            reconnectTimeout = setTimeout(() => {
+               if (!isConnected) { // Double-check we're still disconnected
+                  createBot();
+               } else {
+                  console.log('[INFO] Bot is already connected, cancelling reconnection.');
+               }
+            }, delay);
+         } else if (isConnected) {
+            console.log('[INFO] Bot is already connected, no need to reconnect.');
+         } else {
+            console.log('[ERROR] Maximum reconnection attempts reached. Stopping bot.');
+         }
       });
    }
 
-   bot.on('kicked', (reason) =>
+   bot.on('kicked', (reason) => {
+      isConnected = false; // Mark as disconnected
       console.log(
          '\x1b[33m',
          `[AfkBot] Bot was kicked from the server. Reason: \n${reason}`,
          '\x1b[0m'
-      )
-   );
+      );
+      // Clean up all intervals when kicked
+      if (afkInterval) {
+         clearInterval(afkInterval);
+         afkInterval = null;
+      }
+      if (bot.keepAliveInterval) {
+         clearInterval(bot.keepAliveInterval);
+         bot.keepAliveInterval = null;
+      }
+   });
 
-   bot.on('error', (err) =>
-      console.log(`\x1b[31m[ERROR] ${err.message}`, '\x1b[0m')
-   );
+   bot.on('error', (err) => {
+      isConnected = false; // Mark as disconnected on error
+      console.log(`\x1b[31m[ERROR] ${err.message}`, '\x1b[0m');
+      // Clean up all intervals on error
+      if (afkInterval) {
+         clearInterval(afkInterval);
+         afkInterval = null;
+      }
+      if (bot.keepAliveInterval) {
+         clearInterval(bot.keepAliveInterval);
+         bot.keepAliveInterval = null;
+      }
+   });
+   
+   // Reset reconnect attempts on successful connection
+   bot.on('login', () => {
+      reconnectAttempts = 0;
+      isConnected = true;
+      console.log('[INFO] Successfully connected to server!');
+      
+      // Clear any pending reconnection attempts
+      if (reconnectTimeout) {
+         clearTimeout(reconnectTimeout);
+         reconnectTimeout = null;
+      }
+   });
+   
+
+   
+   // Add connection monitoring
+   bot.on('connect', () => {
+      console.log('[INFO] Connecting to server...');
+   });
+   
+   // Monitor health and connection status
+   setInterval(() => {
+      if (bot.player && bot.player.ping !== undefined) {
+         console.log(`[HEALTH] Ping: ${bot.player.ping}ms, Players online: ${Object.keys(bot.players).length}, Connected: ${isConnected}`);
+      }
+   }, 300000); // Log health every 5 minutes
+   
+   // Return the bot instance for external monitoring
+   return bot;
 }
 
 createBot();

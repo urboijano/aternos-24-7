@@ -4,6 +4,8 @@
   "description": "Afk bot for minecraft servers.",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Lamgerr",
@@ -11,6 +13,14 @@
   "dependencies": {
     "express": "^4.18.1",
     "mineflayer": "^4.3.0",
-    "mineflayer-pathfinder": "^2.1.1"
+    "mineflayer-pathfinder": "^2.1.1",
+    "dotenv": "^16.0.0",
+    "uri-js": "^4.4.1",
+    "ajv": "^8.12.0",
+    "protodef": "^1.15.0",
+    "minecraft-protocol": "^1.44.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   }
 }
