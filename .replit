@@ -1,10 +1,12 @@
-language = "nix"
-run = "node index.js"
-modules = ["nodejs-20"]
+run = "npm start"
+modules = ["nodejs-18"]
+
+[deployment]
+run = ["sh", "-c", "npm start"]
 
 [[ports]]
 localPort = 8000
-externalPort = 8000
+externalPort = 80
 
 [agent]
 expertMode = true

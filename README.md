@@ -1,13 +1,14 @@
-# Afk Bot
+# 🤖 Minecraft AFK Bot - 24/7 Aternos Server Keeper
+
 <p align="center"> 
-    <img src="https://img.shields.io/github/issues/urfate/afk-bot">
-    <img src="https://img.shields.io/github/forks/urfate/afk-bot">
-    <img src="https://img.shields.io/github/stars/urfate/afk-bot">
-    <img src="https://img.shields.io/github/license/urfate/afk-bot">
+    <img src="https://img.shields.io/github/issues/urboijano/aternos-24-7">
+    <img src="https://img.shields.io/github/forks/urboijano/aternos-24-7">
+    <img src="https://img.shields.io/github/stars/urboijano/aternos-24-7">
+    <img src="https://img.shields.io/github/license/urboijano/aternos-24-7">
 </p>
 
 <p align="center">
-    Functional minecraft AFK bot for servers
+    Keep your Aternos Minecraft server online 24/7 with this AFK bot!
 </p>
 
 <p align="center">
