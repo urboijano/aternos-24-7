@@ -3,65 +3,18 @@ const Movements = require('mineflayer-pathfinder').Movements;
 const pathfinder = require('mineflayer-pathfinder').pathfinder;
 const { GoalBlock } = require('mineflayer-pathfinder').goals;
 
-// Load environment variables if available
-try {
-  require('dotenv').config();
-} catch (err) {
-  console.log('💡 dotenv not found, using system environment variables');
-}
-
 const config = require('./settings.json');
 const express = require('express');
-
-// Override config with environment variables if available
-if (process.env.MINECRAFT_HOST) {
-  config.server.ip = process.env.MINECRAFT_HOST;
-}
-if (process.env.MINECRAFT_PORT) {
-  config.server.port = parseInt(process.env.MINECRAFT_PORT);
-}
-if (process.env.MINECRAFT_VERSION) {
-  config.server.version = process.env.MINECRAFT_VERSION;
-}
-if (process.env.BOT_USERNAME) {
-  config['bot-account'].username = process.env.BOT_USERNAME;
-}
-if (process.env.BOT_AUTH_TYPE) {
-  config['bot-account'].type = process.env.BOT_AUTH_TYPE;
-}
 
 const app = express();
 
 app.get('/', (req, res) => {
-  res.send('Minecraft AFK Bot is running! 🎮');
+  res.send('Bot has arrived');
 });
 
-app.get('/health', (req, res) => {
-  const status = {
-    status: 'online',
-    bot_connected: isConnected,
-    uptime: Math.floor(process.uptime()),
-    timestamp: new Date().toISOString(),
-    server: config.server.ip + ':' + config.server.port,
-    reconnect_attempts: reconnectAttempts
-  };
-  res.json(status);
+app.listen(8000, () => {
+  console.log('Server started');
 });
-
-app.get('/ping', (req, res) => {
-  res.send('pong');
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🌐 Web server started on port ${PORT}`);
-  console.log(`🔗 Visit: https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`);
-});
-
-// Keep-alive ping for Replit
-setInterval(() => {
-  console.log('🔄 Keep-alive ping');
-}, 60000); // Ping every minute
 
 let reconnectAttempts = 0;
 const maxReconnectAttempts = 10;
